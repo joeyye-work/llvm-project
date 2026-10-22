@@ -9,6 +9,10 @@
 //===----------------------------------------------------------------------===//
 //
 // This file describes the Groq instructions in TableGen format.
+// TODO(groq-spec): These are provisional scalar stand-in instructions to keep
+// LLVM codegen/MC paths buildable. They are not a complete representation of
+// published TSP slice semantics and will be replaced once official encodings
+// and programming model details are available.
 //
 //===----------------------------------------------------------------------===//
 

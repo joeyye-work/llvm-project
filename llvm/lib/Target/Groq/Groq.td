@@ -14,8 +14,10 @@
 
 include "llvm/Target/Target.td"
 
-// TODO(groq-spec): This backend currently uses a provisional scalar model for
-// bring-up while public Groq LPU ISA/ABI documentation remains incomplete.
+// TODO(groq-spec): Public TSP documentation (e.g. ISCA 2020) describes a
+// functionally sliced streaming architecture. The current backend is a
+// provisional scalar stand-in so LLVM can build and run smoke tests while
+// official ISA/ABI/encoding specifications are unavailable.
 // Replace register/encoding/scheduling assumptions with official definitions.
 
 //===----------------------------------------------------------------------===//

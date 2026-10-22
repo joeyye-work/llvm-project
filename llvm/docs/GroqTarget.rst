@@ -9,79 +9,102 @@ Overview
 ========
 
 This document describes the initial LLVM ``Groq`` backend scaffold.
-Public information about the Groq Lattice Processing Unit (LPU) / Tensor
-Streaming Processor (TSP) is limited; complete ISA encodings
-and a C-style ABI are not publicly available. The current backend is therefore
-a provisional buildable scaffold intended to unblock bring-up, testing, and
-integration.
+The first-generation Groq Tensor Streaming Processor (TSP) is a highly
+specialized streaming architecture whose public ISA/ABI details are incomplete.
+The current backend is therefore intentionally provisional.
 
-Architecture facts and assumptions
+Sources digested for this revision
 ==================================
 
-Verified public facts (high level)
-----------------------------------
+* ISCA 2020 paper: ``Think Fast: A Tensor Streaming Processor (TSP) for
+  Accelerating Deep Learning Workloads`` by Abts et al.
+* Reference text mirror of the paper used in this environment:
+  ``https://raw.githubusercontent.com/bojieli/ai-infra-book/main/references/text/groq-tsp.txt``
 
-* Groq's first-generation Tensor Streaming Processor (TSP) is a spatial,
-  compiler-scheduled architecture with no OoO scheduling or branch prediction.
-* Public material describes slice-level execution units (ICU/MEM/VXM/MXM/SXM)
-  and stream-oriented execution rather than a conventional scalar CPU model.
-* Public docs do not provide a complete, open binary ISA encoding and ABI spec.
+Paper-grounded architecture constraints (verified)
+==================================================
 
-Provisional backend assumptions (MVP)
--------------------------------------
+The publicly available paper describes the following high-level behavior:
 
-To make an initial LLVM backend buildable, this target currently models a
-minimal scalar pseudo-ISA in the style of a conventional LLVM backend:
+* Functionally sliced architecture (ICU/MEM/VXM/MXM/SXM/C2C) instead of
+  conventional per-core pipelines.
+* Streaming producer-consumer execution model; operands/results move on streams
+  across slices.
+* 64 logical streams per lane (32 each direction), with 16-byte min vector
+  granularity and 320-byte max vector length via 20 tiled stages.
+* 220 MiB on-chip SRAM with very high bandwidth; explicit compiler-managed
+  movement and scheduling.
+* Compiler-scheduled timing model using explicit delay/synchronization
+  instructions (e.g., NOP, Sync/Notify, Ifetch) and spatial/temporal stream
+  placement.
+* Public ISA semantics are described at slice level (Table I in the paper), but
+  complete binary encoding details and full ABI/object format specifications are
+  not published.
+
+Backend implications
+====================
+
+Compared to a conventional LLVM CPU backend, a production-accurate Groq
+backend must eventually model:
+
+* stream-centric architectural state rather than scalar GPR-centric state,
+* explicit timing/skew-aware scheduling constraints,
+* explicit SRAM placement and movement primitives,
+* accelerator-style program model rather than a standard C ABI stack model.
+
+Provisional assumptions in this MVP backend
+===========================================
+
+To keep this target buildable and testable in-tree, the current backend uses a
+scalar stand-in model with explicit TODO markers:
 
 * Register model assumptions
 
-  * ``GPR`` integer register class with fixed-width scalar registers.
-  * Conventional reserved stack/frame/link registers are modeled.
-  * TODO: replace with stream/SRAM-centric architectural model once official
-    Groq ISA/ABI details are available.
+  * A conventional integer register class is used for bring-up.
+  * TODO(groq-spec): replace with stream/SRAM-centric architectural modeling.
 
-* Instruction class and encoding assumptions
+* Instruction model assumptions
 
-  * Integer ALU ops, moves, loads/stores, branches, and return are modeled.
-  * Fixed-width instruction encoding is assumed for MC bring-up.
-  * TODO: map to official Groq encoding fields (including timing/skew metadata)
-    when public or partner documentation permits.
+  * Integer ALU, branch, load/store, and return instructions are modeled for
+    minimal SelectionDAG codegen tests.
+  * TODO(groq-spec): map to official Groq slice-level ISA encoding details when
+    available.
 
 * Calling convention assumptions
 
-  * Initial ABI uses a conventional register-return/register-argument style to
-    enable simple IR lowering and smoke tests.
-  * TODO: replace with Groq-accurate ABI/memory interface model.
+  * Conventional argument/return handling is used for LLVM smoke tests.
+  * TODO(groq-spec): replace with Groq-appropriate program/memory interface.
 
-* Pipeline/scheduling assumptions
+* Scheduling assumptions
 
-  * Scheduler model is intentionally conservative and simple for early bring-up.
-  * TODO: represent Groq's cycle-exact scheduling and stream-distance hazards
-    with target-specific scheduling and hazard logic.
+  * Current scheduling is conservative and generic.
+  * TODO(groq-spec): represent timing/skew constraints implied by stream
+    placement and slice transit latency.
 
-Known gaps requiring non-public / proprietary specs
-===================================================
+Known gaps requiring additional public or partner documentation
+===============================================================
 
 * Official opcode encodings and field layouts.
-* Exact instruction timing model and stream skew semantics.
-* Production ABI/calling convention and binary format details.
-* Complete assembler/disassembler behavior for production toolchain parity.
-* Target-specific vector/tensor/matrix operations and lowering paths.
+* Exact instruction timing metadata and operand skew semantics.
+* Production ABI/calling convention and relocation/object-file specification.
+* Full assembler/disassembler parity with Groq production tools.
+* Complete vector/tensor/matrix operation lowering.
 
-Developer notes and limitations
-===============================
+Developer notes and current limitations
+=======================================
 
-The current target should be treated as a bring-up scaffold only:
+The current target should be treated as an MVP bring-up scaffold only.
 
 * Unsupported/incomplete:
 
-  * Full Groq tensor/vector ISA coverage.
-  * Accurate Groq ABI and relocation/object semantics.
-  * Complete asm parser/disassembler fidelity.
-  * End-to-end performance scheduling parity with Groq toolchain.
+  * production-accurate stream register model,
+  * production-accurate Groq ELF/relocation definitions,
+  * complete architectural scheduling model,
+  * complete tensor/matrix lowering pipeline.
 
-* Implemented for MVP:
+* Implemented for bring-up:
 
-  * LLVM target registration and build integration.
-  * Basic SelectionDAG pipeline and asm emission for simple integer codegen
-    smoke tests.
+  * target registration and build integration,
+  * triple parsing and data-layout plumbing,
+  * minimal SelectionDAG/asm emission flow,
+  * focused ``llc -mtriple=groq-unknown-unknown`` smoke tests.

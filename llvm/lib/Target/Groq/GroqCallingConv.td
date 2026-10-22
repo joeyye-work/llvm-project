@@ -5,7 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-// This describes the calling conventions for the Groq ABI.
+// This describes a provisional calling convention for backend bring-up only.
+// TODO(groq-spec): Replace with the official Groq program interface once
+// public ABI/runtime documentation is available.
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
