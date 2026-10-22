@@ -569,6 +569,7 @@ set(LLVM_ALL_TARGETS
   AVR
   BPF
   DirectX
+  Groq
   Hexagon
   Lanai
   LoongArch
