@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 // Groq supported processors.
 //===----------------------------------------------------------------------===//
-class Proc<string Name, list<SubtargetFeature> Features>
-    : Processor<Name, NoItineraries, Features>;
 
-def : Proc<"generic", []>;
-def : Proc<"tsp-v1", []>;
+def : ProcessorModel<"generic", NoSchedModel, []>;
+def : ProcessorModel<"tsp-v1", GroqTSPModel,
+                     [FeatureTSPStreams, FeatureTSPSlices,
+                      FeatureTSPDeterministicTiming]>;

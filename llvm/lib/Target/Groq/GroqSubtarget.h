@@ -64,6 +64,9 @@ public:
 
   const SelectionDAGTargetInfo *getSelectionDAGInfo() const override;
 
+  bool hasTSPStreams() const { return HasTSPStreams; }
+  bool hasTSPSlices() const { return HasTSPSlices; }
+  bool hasTSPDeterministicTiming() const { return HasTSPDeterministicTiming; }
   bool hasDensity() const { return HasDensity; }
   bool hasMAC16() const { return HasMAC16; }
   bool hasWindowed() const { return HasWindowed; }

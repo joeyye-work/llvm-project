@@ -80,6 +80,9 @@ scalar stand-in model with explicit TODO markers:
   * Current scheduling is conservative and generic.
   * TODO(groq-spec): represent timing/skew constraints implied by stream
     placement and slice transit latency.
+  * The backend now exposes provisional ``tsp-v1`` feature hooks
+    (``tsp-streams``, ``tsp-slices``, ``tsp-deterministic-timing``) and a
+    coarse slice-oriented scheduling model for machine-scheduler plumbing.
 
 Known gaps requiring additional public or partner documentation
 ===============================================================

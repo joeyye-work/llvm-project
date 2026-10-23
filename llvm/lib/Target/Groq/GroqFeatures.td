@@ -2,6 +2,26 @@
 // Groq subtarget features.
 //===----------------------------------------------------------------------===//
 
+// TSP architecture traits derived from public ISCA 2020 documentation.
+// TODO(groq-spec): refine and split when official ISA/ABI descriptions are
+// available for LLVM integration.
+def FeatureTSPStreams : SubtargetFeature<"tsp-streams", "HasTSPStreams", "true",
+                                         "Model stream-oriented TSP execution">;
+def HasTSPStreams : Predicate<"Subtarget->hasTSPStreams()">,
+                    AssemblerPredicate<(all_of FeatureTSPStreams)>;
+
+def FeatureTSPSlices : SubtargetFeature<"tsp-slices", "HasTSPSlices", "true",
+                                        "Model functional slice partitioning (ICU/MEM/VXM/MXM/SXM/C2C)">;
+def HasTSPSlices : Predicate<"Subtarget->hasTSPSlices()">,
+                   AssemblerPredicate<(all_of FeatureTSPSlices)>;
+
+def FeatureTSPDeterministicTiming : SubtargetFeature<"tsp-deterministic-timing",
+                                    "HasTSPDeterministicTiming", "true",
+                                    "Model compiler-managed deterministic timing">;
+def HasTSPDeterministicTiming
+    : Predicate<"Subtarget->hasTSPDeterministicTiming()">,
+      AssemblerPredicate<(all_of FeatureTSPDeterministicTiming)>;
+
 // Groq ISA extensions (Groq Options).
 def FeatureDensity : SubtargetFeature<"density", "HasDensity", "true",
                                       "Enable Density instructions">;
