@@ -13,6 +13,9 @@ class GroqInst<int size, dag outs, dag ins, string asmstr, list<dag> pattern,
                  InstrItinClass itin = NoItinerary>
   : Instruction {
   let Namespace = "Groq";
+  // TODO(groq-spec): This maps every modeled instruction to the provisional
+  // 144-queue pool. Real TSP queue/slice assignment requires official details.
+  let SchedRW = [WriteGroqIQ];
 
   let Size = size;
 

@@ -78,9 +78,22 @@ scalar stand-in model with explicit TODO markers:
 * Scheduling assumptions
 
   * Current scheduling is conservative and generic.
+  * ``tsp-v1`` now uses a provisional 144-queue scheduler placeholder:
+
+    * ``IssueWidth = 144`` in ``GroqTSPModel``.
+    * all currently modeled instructions use a default ``WriteGroqIQ`` write
+      resource backed by ``ProcResource<144>``.
+
+  * This enables machine-scheduler experimentation with wide independent
+    instruction issue in bring-up tests, but does **not** yet model:
+
+    * per-queue addressing/selection,
+    * queue-to-slice affinity/constraints,
+    * queue-local timing/skew semantics.
+
   * TODO(groq-spec): represent timing/skew constraints implied by stream
     placement and slice transit latency.
-  * The backend now exposes provisional ``tsp-v1`` feature hooks
+  * The backend exposes provisional ``tsp-v1`` feature hooks
     (``tsp-streams``, ``tsp-slices``, ``tsp-deterministic-timing``) and a
     coarse slice-oriented scheduling model for machine-scheduler plumbing.
 
