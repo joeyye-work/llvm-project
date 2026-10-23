@@ -5,9 +5,11 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
-// This describes a provisional calling convention for backend bring-up only.
-// TODO(groq-spec): Replace with the official Groq program interface once
-// public ABI/runtime documentation is available.
+// This describes a provisional pseudo-register calling convention for backend
+// bring-up only.
+// TODO(groq-spec): Groq TSP is stream-oriented; replace this with the official
+// stream/SRAM program interface once public ABI/runtime documentation is
+// available.
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//

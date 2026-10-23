@@ -18,7 +18,8 @@ include "llvm/Target/Target.td"
 // functionally sliced streaming architecture. The current backend is a
 // provisional scalar stand-in so LLVM can build and run smoke tests while
 // official ISA/ABI/encoding specifications are unavailable.
-// Replace register/encoding/scheduling assumptions with official definitions.
+// Replace placeholder register-like compiler plumbing and encoding/scheduling
+// assumptions with official stream-based definitions.
 
 //===----------------------------------------------------------------------===//
 // Subtarget Features.
@@ -39,7 +40,7 @@ include "GroqSchedule.td"
 include "GroqProcessors.td"
 
 //===----------------------------------------------------------------------===//
-// Register File Description
+// Placeholder compiler operand-state description
 //===----------------------------------------------------------------------===//
 
 include "GroqRegisterInfo.td"

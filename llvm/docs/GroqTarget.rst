@@ -58,10 +58,16 @@ Provisional assumptions in this MVP backend
 To keep this target buildable and testable in-tree, the current backend uses a
 scalar stand-in model with explicit TODO markers:
 
-* Register model assumptions
+* Architectural state assumptions
 
-  * A conventional integer register class is used for bring-up.
-  * TODO(groq-spec): replace with stream/SRAM-centric architectural modeling.
+  * TSP architectural execution is stream-based; this backend does **not** claim
+    a production-accurate architectural register model.
+  * The current backend still uses LLVM register classes as an internal
+    compiler placeholder to carry SSA values through existing SelectionDAG/MC
+    pipelines.
+  * TODO(groq-spec): replace placeholder register-class plumbing with explicit
+    stream endpoint/channel modeling once official integration details are
+    available.
 
 * Instruction model assumptions
 
@@ -72,8 +78,10 @@ scalar stand-in model with explicit TODO markers:
 
 * Calling convention assumptions
 
-  * Conventional argument/return handling is used for LLVM smoke tests.
-  * TODO(groq-spec): replace with Groq-appropriate program/memory interface.
+  * Conventional argument/return handling in pseudo-registers is used only for
+    LLVM smoke tests in this scaffold.
+  * TODO(groq-spec): replace with Groq stream- and SRAM-oriented
+    program/memory interface semantics.
 
 * Scheduling assumptions
 
@@ -113,7 +121,7 @@ The current target should be treated as an MVP bring-up scaffold only.
 
 * Unsupported/incomplete:
 
-  * production-accurate stream register model,
+  * production-accurate stream endpoint/channel model,
   * production-accurate Groq ELF/relocation definitions,
   * complete architectural scheduling model,
   * complete tensor/matrix lowering pipeline.

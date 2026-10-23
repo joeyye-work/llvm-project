@@ -12,10 +12,11 @@
 // Class definitions.
 //===----------------------------------------------------------------------===//
 //
-// TODO(groq-spec): These register files are a scalar placeholder inherited from
-// conventional CPU-style backends. Public Groq TSP material describes
-// stream-centric execution; replace this model with official architectural
-// register/stream state definitions when available.
+// TODO(groq-spec): Public Groq TSP material describes stream-centric execution
+// and function-unit communication via streams, not a classic architectural
+// register file. These register definitions are compiler-internal placeholders
+// inherited from conventional CPU-style backends so LLVM bring-up can proceed.
+// Replace this with official stream endpoint/channel state modeling.
 
 class GroqReg<string n> : Register<n> {
   let Namespace = "Groq";
