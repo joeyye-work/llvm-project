@@ -116,7 +116,7 @@ void ConvertVectorToLLVMPass::runOnOperation() {
   populateVectorTransferLoweringPatterns(patterns);
   populateVectorToLLVMConversionPatterns(
       converter, patterns, reassociateFPReductions, force32BitVectorIndices,
-      useVectorAlignment, enableGEPInboundsNuw);
+      useVectorAlignment, enableGEPInboundsNuw, enableGroqTSP);
 
   // Architecture specific augmentations.
   LLVMConversionTarget target(getContext());

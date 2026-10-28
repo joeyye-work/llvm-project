@@ -32,8 +32,10 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Support/MathExtras.h"
 
 #include <optional>
+#include <string>
 
 using namespace mlir;
 using namespace mlir::vector;
@@ -160,6 +162,176 @@ static Value getAsLLVMValue(OpBuilder &builder, Location loc,
 }
 
 namespace {
+
+static constexpr StringLiteral kGroqTSPIntrinsicMemRead =
+    "llvm.experimental.groq.tsp.mem.read";
+static constexpr StringLiteral kGroqTSPIntrinsicMemWrite =
+    "llvm.experimental.groq.tsp.mem.write";
+
+static LogicalResult checkGroqTSPVectorPolicy(Operation *op, VectorType vectorTy,
+                                              StringRef opName) {
+  if (vectorTy.getRank() != 1)
+    return op->emitError()
+           << "direct Groq/TSP intrinsic lowering for " << opName
+           << " supports only 1-D vectors";
+
+  if (vectorTy.isScalable())
+    return op->emitError()
+           << "direct Groq/TSP intrinsic lowering for " << opName
+           << " requires fixed vectors";
+
+  uint64_t bitWidth = getPrimitiveTypeSizeInBits(vectorTy).getFixedValue();
+  uint64_t byteWidth = llvm::divideCeil(bitWidth, uint64_t(8));
+  if (byteWidth < 16 || byteWidth > 320 || (byteWidth % 16) != 0)
+    return op->emitError()
+           << "direct Groq/TSP intrinsic lowering for " << opName
+           << " requires total vector byte size divisible by 16 and in the "
+              "inclusive range [16, 320]";
+
+  return success();
+}
+
+template <typename OpTy>
+class RejectGroqTSPOpConversion : public ConvertOpToLLVMPattern<OpTy> {
+public:
+  explicit RejectGroqTSPOpConversion(const LLVMTypeConverter &typeConv,
+                                     StringRef message)
+      : ConvertOpToLLVMPattern<OpTy>(typeConv), message(message.str()) {}
+
+  LogicalResult
+  matchAndRewrite(OpTy op, typename OpTy::Adaptor,
+                  ConversionPatternRewriter &) const override {
+    op.emitError(message);
+    return failure();
+  }
+
+private:
+  std::string message;
+};
+
+class GroqTSPVectorLoadOpConversion
+    : public ConvertOpToLLVMPattern<vector::LoadOp> {
+public:
+  explicit GroqTSPVectorLoadOpConversion(const LLVMTypeConverter &typeConv,
+                                         bool enableGEPInboundsNuw)
+      : ConvertOpToLLVMPattern<vector::LoadOp>(typeConv),
+        enableGEPInboundsNuw(enableGEPInboundsNuw) {}
+
+  LogicalResult
+  matchAndRewrite(vector::LoadOp loadOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (loadOp.getNontemporal()) {
+      loadOp.emitError(
+          "direct Groq/TSP intrinsic lowering for vector.load does not "
+          "support nontemporal loads");
+      return failure();
+    }
+
+    MemRefType memRefTy = loadOp.getMemRefType();
+    if (failed(isMemRefTypeSupported(memRefTy, *this->getTypeConverter()))) {
+      loadOp.emitError("memref type not supported for Groq/TSP lowering");
+      return failure();
+    }
+
+    auto llvmVecType = dyn_cast<VectorType>(
+        this->typeConverter->convertType(loadOp.getVectorType()));
+    if (!llvmVecType) {
+      loadOp.emitError("could not convert vector type for Groq/TSP lowering");
+      return failure();
+    }
+    if (failed(checkGroqTSPVectorPolicy(loadOp, llvmVecType, "vector.load")))
+      return failure();
+
+    LLVM::GEPNoWrapFlags noWrapFlags = LLVM::GEPNoWrapFlags::none;
+    if (enableGEPInboundsNuw) {
+      auto [strides, ignoredOffset] = memRefTy.getStridesAndOffset();
+      (void)ignoredOffset;
+      assert((strides.empty() || strides.back() == 1) &&
+             "vector.load requires unit trailing memref stride");
+      assert(!memref::hasNegativeStaticStride(memRefTy) &&
+             "vector.load requires non-negative static memref strides");
+      noWrapFlags = noWrapFlags | LLVM::GEPNoWrapFlags::inbounds;
+      noWrapFlags = noWrapFlags | LLVM::GEPNoWrapFlags::nuw;
+    }
+
+    Value dataPtr = this->getStridedElementPtr(rewriter, loadOp.getLoc(),
+                                               memRefTy, adaptor.getBase(),
+                                               adaptor.getIndices(), noWrapFlags);
+    auto i32Type = rewriter.getI32Type();
+    Value stream = LLVM::ConstantOp::create(
+        rewriter, loadOp.getLoc(), i32Type, rewriter.getI32IntegerAttr(0));
+    auto call = LLVM::CallIntrinsicOp::create(
+        rewriter, loadOp.getLoc(), llvmVecType,
+        rewriter.getStringAttr(kGroqTSPIntrinsicMemRead),
+        ValueRange{dataPtr, stream});
+    rewriter.replaceOp(loadOp, call->getResult(0));
+    return success();
+  }
+
+private:
+  bool enableGEPInboundsNuw;
+};
+
+class GroqTSPVectorStoreOpConversion
+    : public ConvertOpToLLVMPattern<vector::StoreOp> {
+public:
+  explicit GroqTSPVectorStoreOpConversion(const LLVMTypeConverter &typeConv,
+                                          bool enableGEPInboundsNuw)
+      : ConvertOpToLLVMPattern<vector::StoreOp>(typeConv),
+        enableGEPInboundsNuw(enableGEPInboundsNuw) {}
+
+  LogicalResult
+  matchAndRewrite(vector::StoreOp storeOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (storeOp.getNontemporal()) {
+      storeOp.emitError(
+          "direct Groq/TSP intrinsic lowering for vector.store does not "
+          "support nontemporal stores");
+      return failure();
+    }
+
+    MemRefType memRefTy = storeOp.getMemRefType();
+    if (failed(isMemRefTypeSupported(memRefTy, *this->getTypeConverter()))) {
+      storeOp.emitError("memref type not supported for Groq/TSP lowering");
+      return failure();
+    }
+
+    auto llvmVecType = dyn_cast<VectorType>(
+        this->typeConverter->convertType(storeOp.getVectorType()));
+    if (!llvmVecType) {
+      storeOp.emitError("could not convert vector type for Groq/TSP lowering");
+      return failure();
+    }
+    if (failed(checkGroqTSPVectorPolicy(storeOp, llvmVecType, "vector.store")))
+      return failure();
+
+    LLVM::GEPNoWrapFlags noWrapFlags = LLVM::GEPNoWrapFlags::none;
+    if (enableGEPInboundsNuw) {
+      auto [strides, ignoredOffset] = memRefTy.getStridesAndOffset();
+      (void)ignoredOffset;
+      assert((strides.empty() || strides.back() == 1) &&
+             "vector.store requires unit trailing memref stride");
+      assert(!memref::hasNegativeStaticStride(memRefTy) &&
+             "vector.store requires non-negative static memref strides");
+      noWrapFlags = noWrapFlags | LLVM::GEPNoWrapFlags::inbounds;
+      noWrapFlags = noWrapFlags | LLVM::GEPNoWrapFlags::nuw;
+    }
+
+    Value dataPtr = this->getStridedElementPtr(rewriter, storeOp.getLoc(),
+                                               memRefTy, adaptor.getBase(),
+                                               adaptor.getIndices(), noWrapFlags);
+    auto i32Type = rewriter.getI32Type();
+    Value stream = LLVM::ConstantOp::create(
+        rewriter, storeOp.getLoc(), i32Type, rewriter.getI32IntegerAttr(0));
+    rewriter.replaceOpWithNewOp<LLVM::CallIntrinsicOp>(
+        storeOp, TypeRange{}, rewriter.getStringAttr(kGroqTSPIntrinsicMemWrite),
+        ValueRange{adaptor.getValueToStore(), dataPtr, stream});
+    return success();
+  }
+
+private:
+  bool enableGEPInboundsNuw;
+};
 
 /// Trivial Vector to LLVM conversions
 using VectorScaleOpConversion =
@@ -2328,18 +2500,30 @@ void mlir::vector::populateVectorTransposeToFlatTranspose(
 void mlir::populateVectorToLLVMConversionPatterns(
     const LLVMTypeConverter &converter, RewritePatternSet &patterns,
     bool reassociateFPReductions, bool force32BitVectorIndices,
-    bool useVectorAlignment, bool enableGEPInboundsNuw) {
+    bool useVectorAlignment, bool enableGEPInboundsNuw, bool enableGroqTSP) {
   // This function populates only ConversionPatterns, not RewritePatterns.
   MLIRContext *ctx = converter.getDialect()->getContext();
   patterns.add<VectorReductionOpConversion>(converter, reassociateFPReductions);
   patterns.add<VectorCreateMaskOpConversion>(ctx, force32BitVectorIndices);
-  patterns.add<VectorLoadStoreConversion<vector::LoadOp>,
-               VectorLoadStoreConversion<vector::MaskedLoadOp>,
-               VectorLoadStoreConversion<vector::StoreOp>,
-               VectorLoadStoreConversion<vector::MaskedStoreOp>>(
-      converter, useVectorAlignment, enableGEPInboundsNuw);
-  patterns.add<VectorGatherOpConversion, VectorScatterOpConversion>(
-      converter, useVectorAlignment);
+  if (enableGroqTSP) {
+    patterns.add<GroqTSPVectorLoadOpConversion, GroqTSPVectorStoreOpConversion>(
+        converter, enableGEPInboundsNuw);
+    patterns.add<RejectGroqTSPOpConversion<vector::MaskedLoadOp>,
+                 RejectGroqTSPOpConversion<vector::MaskedStoreOp>,
+                 RejectGroqTSPOpConversion<vector::GatherOp>,
+                 RejectGroqTSPOpConversion<vector::ScatterOp>>(
+        converter,
+        "direct Groq/TSP intrinsic lowering currently supports only "
+        "vector.load/vector.store");
+  } else {
+    patterns.add<VectorLoadStoreConversion<vector::LoadOp>,
+                 VectorLoadStoreConversion<vector::MaskedLoadOp>,
+                 VectorLoadStoreConversion<vector::StoreOp>,
+                 VectorLoadStoreConversion<vector::MaskedStoreOp>>(
+        converter, useVectorAlignment, enableGEPInboundsNuw);
+    patterns.add<VectorGatherOpConversion, VectorScatterOpConversion>(
+        converter, useVectorAlignment);
+  }
   patterns.add<VectorBitCastOpConversion, VectorShuffleOpConversion,
                VectorExtractOpConversion, VectorFMAOp1DConversion,
                VectorInsertOpConversion, VectorPrintOpConversion,

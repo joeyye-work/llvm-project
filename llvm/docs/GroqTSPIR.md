@@ -25,6 +25,15 @@ MLIR LLVM dialect users can emit these intrinsics through
 `llvm.call_intrinsic "llvm.experimental.groq.tsp.*"`, and MLIR verifies the
 same fixed-vector byte-width policy before LLVM IR translation.
 
+MLIR Vector dialect lowering also supports a direct path to these intrinsics
+via `-convert-vector-to-llvm='enable-groq-tsp=1'` for a focused subset:
+
+- `vector.load`  -> `llvm.experimental.groq.tsp.mem.read`
+- `vector.store` -> `llvm.experimental.groq.tsp.mem.write`
+
+When this option is enabled, direct Groq/TSP lowering applies only to these
+two operations and currently rejects masked/gather/scatter vector memory ops.
+
 ## Vector-length policy
 
 For Groq/TSP intrinsics that carry vector stream operands/results, LLVM IR
@@ -32,6 +41,9 @@ verification currently requires fixed vector sizes that are:
 
 - multiples of 16 bytes, and
 - in the inclusive range 16..320 bytes.
+
+For the direct Vector→Groq/TSP lowering path, vectors are additionally required
+to be fixed (non-scalable) 1-D vectors.
 
 Follow-up PRs can refine intrinsic semantics and add backend lowering when more
 public architectural detail is available.
