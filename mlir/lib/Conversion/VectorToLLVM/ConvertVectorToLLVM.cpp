@@ -180,7 +180,7 @@ static LogicalResult checkGroqTSPVectorPolicy(Operation *op, VectorType vectorTy
            << "direct Groq/TSP intrinsic lowering for " << opName
            << " requires fixed vectors";
 
-  uint64_t bitWidth = getPrimitiveTypeSizeInBits(vectorTy).getFixedValue();
+  uint64_t bitWidth = LLVM::getPrimitiveTypeSizeInBits(vectorTy).getFixedValue();
   uint64_t byteWidth = llvm::divideCeil(bitWidth, uint64_t(8));
   if (byteWidth < 16 || byteWidth > 320 || (byteWidth % 16) != 0)
     return op->emitError()
