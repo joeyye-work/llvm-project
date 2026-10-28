@@ -21,6 +21,10 @@ only. It intentionally does **not** add backend instruction definitions or
 codegen work (including ISel, MC, asm printer/parser, disassembler, object
 writer, or target lowering).
 
+MLIR LLVM dialect users can emit these intrinsics through
+`llvm.call_intrinsic "llvm.experimental.groq.tsp.*"`, and MLIR verifies the
+same fixed-vector byte-width policy before LLVM IR translation.
+
 ## Vector-length policy
 
 For Groq/TSP intrinsics that carry vector stream operands/results, LLVM IR
