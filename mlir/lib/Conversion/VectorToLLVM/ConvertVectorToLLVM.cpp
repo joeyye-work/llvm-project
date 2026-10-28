@@ -325,7 +325,8 @@ public:
         rewriter, storeOp.getLoc(), i32Type, rewriter.getI32IntegerAttr(0));
     rewriter.replaceOpWithNewOp<LLVM::CallIntrinsicOp>(
         storeOp, TypeRange{}, rewriter.getStringAttr(kGroqTSPIntrinsicMemWrite),
-        ValueRange{adaptor.getValueToStore(), dataPtr, stream});
+        ValueRange{adaptor.getValueToStore(), dataPtr, stream},
+        LLVM::FastmathFlagsAttr{});
     return success();
   }
 
