@@ -61,6 +61,7 @@ SecurityTransparencyReports
 SystemLibrary
 TransformMetadata
 TypeMetadata
+GroqTSPIR
 XRayFDRFormat
 ```
 
@@ -135,6 +136,10 @@ XRayFDRFormat
 
 {doc}`ConvergentOperations`
 :   Description of `convergent` operation semantics and related intrinsics.
+
+{doc}`Groq/TSP IR Modeling (Incremental, IR-Only) <GroqTSPIR>`
+:   Documents the paper-bounded Groq/TSP IR-only intrinsic milestone and
+    deferred backend/codegen scope.
 
 ### Testing and Debugging
 
