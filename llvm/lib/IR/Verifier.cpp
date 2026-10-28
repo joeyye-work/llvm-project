@@ -6286,9 +6286,53 @@ void Verifier::visitIntrinsicCall(Intrinsic::ID ID, CallBase &Call) {
   if (!Intrinsic::isSignatureValid(ID, Call.getFunctionType(), OverloadTys))
     return;
 
+  auto CheckGroqTSPVectorType = [&](Type *Ty) {
+    Check(isa<FixedVectorType>(Ty),
+          "llvm.experimental.groq.tsp vector operands/results must be fixed "
+          "vectors",
+          &Call);
+    if (!isa<FixedVectorType>(Ty))
+      return;
+
+    uint64_t SizeInBytes = DL.getTypeStoreSize(Ty).getKnownMinValue();
+    Check(SizeInBytes >= 16 && SizeInBytes <= 320 && (SizeInBytes % 16) == 0,
+          "llvm.experimental.groq.tsp vector operands/results must be "
+          "multiples of 16 bytes in the inclusive range [16, 320]",
+          &Call);
+  };
+
   switch (ID) {
   default:
     break;
+  case Intrinsic::experimental_groq_tsp_icu_ifetch:
+  case Intrinsic::experimental_groq_tsp_mem_read:
+  case Intrinsic::experimental_groq_tsp_mem_write:
+  case Intrinsic::experimental_groq_tsp_mem_gather:
+  case Intrinsic::experimental_groq_tsp_mem_scatter:
+  case Intrinsic::experimental_groq_tsp_vxm_unary:
+  case Intrinsic::experimental_groq_tsp_vxm_binary:
+  case Intrinsic::experimental_groq_tsp_vxm_type_convert:
+  case Intrinsic::experimental_groq_tsp_vxm_relu:
+  case Intrinsic::experimental_groq_tsp_vxm_tanh:
+  case Intrinsic::experimental_groq_tsp_vxm_exp:
+  case Intrinsic::experimental_groq_tsp_vxm_rsqrt:
+  case Intrinsic::experimental_groq_tsp_mxm_lw:
+  case Intrinsic::experimental_groq_tsp_mxm_iw:
+  case Intrinsic::experimental_groq_tsp_mxm_acc:
+  case Intrinsic::experimental_groq_tsp_sxm_shift_updown:
+  case Intrinsic::experimental_groq_tsp_sxm_permute:
+  case Intrinsic::experimental_groq_tsp_sxm_distribute:
+  case Intrinsic::experimental_groq_tsp_sxm_rotate_stream:
+  case Intrinsic::experimental_groq_tsp_sxm_transpose:
+  case Intrinsic::experimental_groq_tsp_c2c_send:
+  case Intrinsic::experimental_groq_tsp_c2c_receive: {
+    if (Call.getType()->isVectorTy())
+      CheckGroqTSPVectorType(Call.getType());
+    for (Value *Arg : Call.args())
+      if (Arg->getType()->isVectorTy())
+        CheckGroqTSPVectorType(Arg->getType());
+    break;
+  }
   case Intrinsic::assume: {
     if (Call.hasOperandBundles()) {
       auto *Cond = dyn_cast<ConstantInt>(Call.getArgOperand(0));

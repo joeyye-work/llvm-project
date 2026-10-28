@@ -31,6 +31,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/Error.h"
 
 #include "LLVMDialectBytecode.h"
@@ -4201,9 +4202,44 @@ OpFoldResult LLVM::OrOp::fold(FoldAdaptor adaptor) {
 // CallIntrinsicOp
 //===----------------------------------------------------------------------===//
 
+static bool isGroqTSPIntrinsic(StringRef intrinsicName) {
+  return intrinsicName.starts_with("llvm.experimental.groq.tsp.");
+}
+
+static LogicalResult verifyGroqTSPVectorWidth(Operation *op, Type type,
+                                              StringRef kind) {
+  auto vecType = dyn_cast<VectorType>(type);
+  if (!vecType)
+    return success();
+
+  if (vecType.isScalable())
+    return op->emitOpError()
+           << "llvm.experimental.groq.tsp vector " << kind
+           << " must be fixed vectors";
+
+  uint64_t bitWidth = getPrimitiveTypeSizeInBits(vecType).getFixedValue();
+  uint64_t byteWidth = llvm::divideCeil(bitWidth, uint64_t(8));
+  if (byteWidth < 16 || byteWidth > 320 || (byteWidth % 16) != 0) {
+    return op->emitOpError()
+           << "llvm.experimental.groq.tsp vector " << kind
+           << " must have total byte length divisible by 16 and in the "
+              "inclusive range [16, 320]";
+  }
+
+  return success();
+}
+
 LogicalResult CallIntrinsicOp::verify() {
   if (!getIntrin().starts_with("llvm."))
     return emitOpError() << "intrinsic name must start with 'llvm.'";
+  if (isGroqTSPIntrinsic(getIntrin())) {
+    for (Type operandType : getOperandTypes())
+      if (failed(verifyGroqTSPVectorWidth(*this, operandType, "operands")))
+        return failure();
+    for (Type resultType : getResultTypes())
+      if (failed(verifyGroqTSPVectorWidth(*this, resultType, "results")))
+        return failure();
+  }
   if (failed(verifyOperandBundles(*this)))
     return failure();
   return success();

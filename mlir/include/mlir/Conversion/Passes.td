@@ -1759,6 +1759,10 @@ def ConvertVectorToLLVMPass : Pass<"convert-vector-to-llvm"> {
     Option<"x86", "enable-x86",
            "bool", /*default=*/"false",
            "Enables the use of X86 dialect while lowering the vector dialect.">,
+    Option<"enableGroqTSP", "enable-groq-tsp",
+           "bool", /*default=*/"false",
+           "Enables direct lowering of supported vector ops to "
+           "llvm.experimental.groq.tsp.* intrinsics.">,
     Option<"vectorContractLowering", "vector-contract-lowering",
            "vector::VectorContractLowering",
            /*default=*/"vector::VectorContractLowering::Dot",
